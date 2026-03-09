@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 Studyos - Smart Notes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+            min-height: 100vh;
+        }
+
+        .editor-content {
+            outline: none;
+            min-height: 400px;
+            line-height: 1.8;
+        }
+
+        .editor-content:empty:before {
+            content: 'Start typing your note...';
+            color: #9ca3af;
+        }
+
+        .note-item {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .note-item:hover {
+            transform: translateX(4px);
+        }
+
+        .note-item.active {
+            transform: translateX(0);
+        }
+
+        .btn {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .save-indicator {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        .glow {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+        }
+
+        .format-btn {
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: all 0.15s;
+        }
+
+        .format-btn:hover {
+            background: #f3f4f6;
+        }
+
+        .format-btn:active {
+            transform: scale(0.9);
+            background: #e5e7eb;
+        }
+
+        .format-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .slide-in {
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideIn {
+            from { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const supabase = createClient(
+            'https://rlxlnmcesiagglmajzwh.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJseGxubWNlc2lhZ2dsbWFqendoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNjU3NTAsImV4cCI6MjA4ODY0MTc1MH0.KVawKGf8JOUymKP5DkjIRNawrkV-VraFDdFVasKhyrE'
+        );
+
+        class StudyosApp {
+            constructor() {
+                this.user = null;
+                this.notes = [];
+                this.currentNote = null;
+                this.saveStatus = 'saved';
+                this.saveTimeout = null;
+                this.isAuthMode = 'login';
+                this.editorRef = null;
+                this.init();
+            }
+
+            async init() {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    this.user = session.user;
+                    await this.loadNotes();
+                }
+                this.render();
+            }
+
+            async loadNotes() {
+                const { data, error } = await supabase
+                    .from('notes')
+                    .select('*')
+                    .order('updated_at', { ascending: false });
+                
+                if (error) {
+                    console.error('Error loading notes:', error);
+                    return;
+                }
+                
+                this.notes = data || [];
+                if (this.notes.length > 0 && !this.currentNote) {
+                    this.currentNote = this.notes[0];
+                }
+                this.render();
+            }
+
+            async signup(email, password) {
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                });
+                
+                if (error) {
+                    alert(error.message);
+                    return;
+                }
+                
+                alert('Check your email to confirm your account!');
+            }
+
+            async login(email, password) {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+                
+                if (error) {
+                    alert(error.message);
+                    return;
+                }
+                
+                this.user = data.user;
+                await this.loadNotes();
+            }
+
+            async logout() {
+                await supabase.auth.signOut();
+                this.user = null;
+                this.notes = [];
+                this.currentNote = null;
+                this.render();
+            }
+
+            async createNote() {
+                const { data, error } = await supabase
+                    .from('notes')
+                    .insert([
+                        { 
+                            user_id: this.user.id,
+                            title: 'Untitled Note',
+                            content: ''
+                        }
+                    ])
+                    .select()
+                    .single();
+                
+                if (error) {
+                    console.error('Error creating note:', error);
+                    return;
+                }
+                
+                this.notes.unshift(data);
+                this.currentNote = data;
+                this.render();
+            }
+
+            async deleteNote(noteId) {
+                if (!confirm('Delete this note?')) return;
+                
+                const { error } = await supabase
+                    .from('notes')
+                    .delete()
+                    .eq('id', noteId);
+                
+                if (error) {
+                    console.error('Error deleting note:', error);
+                    return;
+                }
+                
+                this.notes = this.notes.filter(n => n.id !== noteId);
+                if (this.currentNote?.id === noteId) {
+                    this.currentNote = this.notes[0] || null;
+                }
+                this.render();
+            }
+
+            selectNote(note) {
+                this.currentNote = note;
+                this.render();
+            }
+
+            updateNoteContent(content) {
+                if (!this.currentNote) return;
+                
+                this.currentNote.content = content;
+                this.saveStatus = 'saving';
+                this.render();
+                
+                clearTimeout(this.saveTimeout);
+                this.saveTimeout = setTimeout(() => this.saveNote(), 500);
+            }
+
+            updateNoteTitle(title) {
+                if (!this.currentNote) return;
+                
+                this.currentNote.title = title || 'Untitled Note';
+                this.saveStatus = 'saving';
+                this.render();
+                
+                clearTimeout(this.saveTimeout);
+                this.saveTimeout = setTimeout(() => this.saveNote(), 500);
+            }
+
+            async saveNote() {
+                if (!this.currentNote) return;
+                
+                const { error } = await supabase
+                    .from('notes')
+                    .update({
+                        title: this.currentNote.title,
+                        content: this.currentNote.content,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', this.currentNote.id);
+                
+                if (error) {
+                    console.error('Error saving note:', error);
+                    return;
+                }
+                
+                this.saveStatus = 'saved';
+                this.render();
+            }
+
+            formatText(command, value = null) {
+                document.execCommand(command, false, value);
+                if (this.editorRef) {
+                    this.updateNoteContent(this.editorRef.innerHTML);
+                }
+            }
+
+            render() {
+                const app = document.getElementById('app');
+                
+                if (!this.user) {
+                    app.innerHTML = this.renderAuth();
+                    this.attachAuthListeners();
+                } else {
+                    app.innerHTML = this.renderMain();
+                    this.attachMainListeners();
+                }
+            }
+
+            renderAuth() {
+                return `
+                    <div class="min-h-screen flex items-center justify-center p-4">
+                        <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md slide-in">
+                            <div class="text-center mb-8">
+                                <h1 class="text-4xl font-bold text-gray-800 mb-2">📚 Studyos</h1>
+                                <p class="text-gray-600">Your smart note-taking companion</p>
+                            </div>
+                            
+                            <div class="flex gap-2 mb-6">
+                                <button 
+                                    class="btn flex-1 py-2 rounded-lg font-medium ${this.isAuthMode === 'login' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}"
+                                    onclick="app.setAuthMode('login')"
+                                >
+                                    Login
+                                </button>
+                                <button 
+                                    class="btn flex-1 py-2 rounded-lg font-medium ${this.isAuthMode === 'signup' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}"
+                                    onclick="app.setAuthMode('signup')"
+                                >
+                                    Sign Up
+                                </button>
+                            </div>
+                            
+                            <form id="authForm" class="space-y-4">
+                                <div>
+                                    <input 
+                                        type="email" 
+                                        id="email" 
+                                        placeholder="Email"
+                                        required
+                                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                                    >
+                                </div>
+                                <div>
+                                    <input 
+                                        type="password" 
+                                        id="password" 
+                                        placeholder="Password"
+                                        required
+                                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                                    >
+                                </div>
+                                <button 
+                                    type="submit"
+                                    class="btn w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl"
+                                >
+                                    ${this.isAuthMode === 'login' ? 'Login' : 'Sign Up'}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderMain() {
+                return `
+                    <div class="h-screen flex flex-col">
+                        <!-- Header -->
+                        <header class="glass border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                            <h1 class="text-2xl font-bold text-gray-800">📚 Studyos</h1>
+                            <div class="flex items-center gap-4">
+                                <span class="text-sm text-gray-600">${this.user.email}</span>
+                                <button 
+                                    onclick="app.logout()"
+                                    class="btn px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium"
+                                >
+                                    Sign Out
+                                </button>
+                            </div>
+                        </header>
+
+                        <!-- Main Content -->
+                        <div class="flex-1 flex overflow-hidden">
+                            <!-- Sidebar -->
+                            <aside class="w-80 glass border-r border-gray-200 flex flex-col">
+                                <div class="p-4">
+                                    <button 
+                                        onclick="app.createNote()"
+                                        class="btn w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                                    >
+                                        <span class="text-xl">+</span>
+                                        New Note
+                                    </button>
+                                </div>
+                                
+                                <div class="flex-1 overflow-y-auto px-4 space-y-2">
+                                    ${this.notes.length === 0 ? `
+                                        <div class="text-center py-12 text-gray-500">
+                                            <p class="text-sm">No notes yet</p>
+                                            <p class="text-xs mt-2">Create your first note!</p>
+                                        </div>
+                                    ` : this.notes.map(note => `
+                                        <div 
+                                            class="note-item ${this.currentNote?.id === note.id ? 'active' : ''} p-3 rounded-lg cursor-pointer ${this.currentNote?.id === note.id ? 'bg-blue-50 border-l-4 border-blue-500 shadow-sm' : 'hover:bg-gray-50 border-l-4 border-transparent'}"
+                                            onclick="app.selectNote(${JSON.stringify(note).replace(/"/g, '&quot;')})"
+                                        >
+                                            <div class="flex items-start justify-between gap-2">
+                                                <h3 class="font-medium text-gray-900 truncate flex-1">
+                                                    ${note.title}
+                                                </h3>
+                                                <button 
+                                                    onclick="event.stopPropagation(); app.deleteNote('${note.id}')"
+                                                    class="text-gray-400 hover:text-red-500 transition-colors"
+                                                    title="Delete"
+                                                >
+                                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <p class="text-xs text-gray-500 mt-1">
+                                                ${new Date(note.updated_at).toLocaleDateString()} ${new Date(note.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </aside>
+
+                            <!-- Editor -->
+                            <main class="flex-1 flex flex-col bg-white">
+                                ${!this.currentNote ? `
+                                    <div class="flex-1 flex items-center justify-center text-gray-400">
+                                        <div class="text-center">
+                                            <svg class="w-24 h-24 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            <p class="text-lg">Select a note or create a new one</p>
+                                        </div>
+                                    </div>
+                                ` : `
+                                    <div class="border-b border-gray-200 p-6 space-y-4">
+                                        <input 
+                                            type="text"
+                                            id="noteTitle"
+                                            value="${this.currentNote.title}"
+                                            class="text-3xl font-bold text-gray-900 w-full outline-none border-none focus:ring-2 focus:ring-blue-200 rounded-lg px-2 py-1"
+                                            placeholder="Note Title"
+                                        >
+                                        
+                                        <!-- Toolbar -->
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <button 
+                                                class="format-btn"
+                                                onclick="app.formatText('bold')"
+                                                title="Bold (Ctrl/Cmd+B)"
+                                            >
+                                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M5 4a1 1 0 011-1h5.5a3.5 3.5 0 012.028 6.366A3.5 3.5 0 0112 16H6a1 1 0 01-1-1V4zm2 1v5h4.5a1.5 1.5 0 000-3H7zm0 7v3h5a1.5 1.5 0 000-3H7z" clip-rule="evenodd" />
+                                                </svg>
+                                            </button>
+                                            
+                                            <button 
+                                                class="format-btn"
+                                                onclick="app.formatText('italic')"
+                                                title="Italic (Ctrl/Cmd+I)"
+                                            >
+                                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1z" clip-rule="evenodd" transform="rotate(15 10 10)"/>
+                                                </svg>
+                                            </button>
+
+                                            <div class="w-px h-6 bg-gray-300"></div>
+
+                                            <button 
+                                                class="format-btn px-3"
+                                                onclick="app.formatText('fontSize', '1')"
+                                                title="Small"
+                                            >
+                                                <span class="text-xs font-medium">S</span>
+                                            </button>
+                                            
+                                            <button 
+                                                class="format-btn px-3"
+                                                onclick="app.formatText('fontSize', '3')"
+                                                title="Normal"
+                                            >
+                                                <span class="text-sm font-medium">M</span>
+                                            </button>
+                                            
+                                            <button 
+                                                class="format-btn px-3"
+                                                onclick="app.formatText('fontSize', '5')"
+                                                title="Large"
+                                            >
+                                                <span class="text-base font-medium">L</span>
+                                            </button>
+                                            
+                                            <button 
+                                                class="format-btn px-3"
+                                                onclick="app.formatText('fontSize', '6')"
+                                                title="Extra Large"
+                                            >
+                                                <span class="text-lg font-medium">XL</span>
+                                            </button>
+
+                                            <div class="flex-1"></div>
+
+                                            <!-- Save Status -->
+                                            <div class="save-indicator">
+                                                ${this.saveStatus === 'saving' ? `
+                                                    <span class="text-gray-500 text-sm flex items-center gap-2">
+                                                        <svg class="w-4 h-4 spinner" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        Saving...
+                                                    </span>
+                                                ` : `
+                                                    <span class="text-emerald-500 text-sm flex items-center gap-2">
+                                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                                        </svg>
+                                                        Saved
+                                                    </span>
+                                                `}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Editor Content -->
+                                    <div class="flex-1 overflow-y-auto p-6">
+                                        <div 
+                                            id="editor"
+                                            class="editor-content text-gray-900 focus:outline-none"
+                                            contenteditable="true"
+                                        >${this.currentNote.content}</div>
+                                    </div>
+                                `}
+                            </main>
+                        </div>
+                    </div>
+                `;
+            }
+
+            attachAuthListeners() {
+                const form = document.getElementById('authForm');
+                if (form) {
+                    form.onsubmit = (e) => {
+                        e.preventDefault();
+                        const email = document.getElementById('email').value;
+                        const password = document.getElementById('password').value;
+                        
+                        if (this.isAuthMode === 'login') {
+                            this.login(email, password);
+                        } else {
+                            this.signup(email, password);
+                        }
+                    };
+                }
+            }
+
+            attachMainListeners() {
+                const editor = document.getElementById('editor');
+                if (editor) {
+                    this.editorRef = editor;
+                    
+                    editor.oninput = () => {
+                        this.updateNoteContent(editor.innerHTML);
+                    };
+
+                    editor.onkeydown = (e) => {
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                            e.preventDefault();
+                            this.formatText('bold');
+                        }
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+                            e.preventDefault();
+                            this.formatText('italic');
+                        }
+                    };
+                }
+
+                const titleInput = document.getElementById('noteTitle');
+                if (titleInput) {
+                    titleInput.oninput = (e) => {
+                        this.updateNoteTitle(e.target.value);
+                    };
+                }
+            }
+
+            setAuthMode(mode) {
+                this.isAuthMode = mode;
+                this.render();
+            }
+        }
+
+        // Initialize app
+        window.app = new StudyosApp();
+    </script>
+</body>
+</html>
