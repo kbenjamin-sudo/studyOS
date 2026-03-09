@@ -3,120 +3,745 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📚 Studyos - Smart Notes</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Studyos – Your Learning Companion</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"></script>
     <style>
+        :root {
+            --cream: #FAF7F0;
+            --ink: #2D2A26;
+            --terracotta: #D97757;
+            --forest: #6B8E7F;
+            --sand: #E8DCC4;
+            --warm-red: #C85846;
+            --soft-green: #A4C3B2;
+            --deep-ink: #1A1816;
+            --stroke: rgba(45, 42, 38, 0.12);
+            --glow: rgba(217, 119, 87, 0.2);
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+
+        @keyframes celebrate {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.15) rotate(-8deg); }
+            75% { transform: scale(1.15) rotate(8deg); }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes confetti {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(1000px) rotate(720deg); opacity: 0; }
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 20px var(--glow); }
+            50% { box-shadow: 0 0 40px var(--glow), 0 0 60px var(--glow); }
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+            font-family: 'Inter', sans-serif;
+            background: var(--cream);
+            color: var(--ink);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Fraunces', serif;
+        }
+
+        /* Auth Screen */
+        .auth-screen {
             min-height: 100vh;
-        }
-
-        .editor-content {
-            outline: none;
-            min-height: 400px;
-            line-height: 1.8;
-        }
-
-        .editor-content:empty:before {
-            content: 'Start typing your note...';
-            color: #9ca3af;
-        }
-
-        .note-item {
-            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .note-item:hover {
-            transform: translateX(4px);
-        }
-
-        .note-item.active {
-            transform: translateX(0);
-        }
-
-        .btn {
-            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .btn:active {
-            transform: scale(0.95);
-        }
-
-        .save-indicator {
-            animation: fadeIn 0.3s ease-in-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .spinner {
-            animation: spin 1s linear infinite;
-        }
-
-        .glow {
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .glass {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-        }
-
-        .format-btn {
-            width: 36px;
-            height: 36px;
-            display: inline-flex;
+            display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 8px;
-            transition: all 0.15s;
+            background: linear-gradient(135deg, var(--cream) 0%, var(--sand) 100%);
+            padding: 2rem;
         }
 
-        .format-btn:hover {
-            background: #f3f4f6;
+        .auth-container {
+            background: white;
+            border: 3px solid var(--stroke);
+            border-radius: 24px;
+            padding: 3rem;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(45, 42, 38, 0.08);
+            animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .format-btn:active {
-            transform: scale(0.9);
-            background: #e5e7eb;
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
         }
 
-        .format-btn.active {
-            background: #3b82f6;
+        .auth-header h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            color: var(--ink);
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.03em;
+        }
+
+        .auth-header p {
+            color: var(--ink);
+            opacity: 0.6;
+            font-size: 1rem;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 3px solid var(--stroke);
+            padding-bottom: 0.5rem;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 0.8rem;
+            border: none;
+            background: none;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--ink);
+            opacity: 0.4;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .auth-tab.active {
+            opacity: 1;
+            color: var(--terracotta);
+        }
+
+        .auth-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -0.65rem;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--terracotta), var(--forest));
+            border-radius: 3px;
+        }
+
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--ink);
+        }
+
+        .form-group input {
+            padding: 1rem 1.2rem;
+            border: 2px solid var(--stroke);
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: var(--cream);
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--terracotta);
+            box-shadow: 0 0 0 4px var(--glow);
+            background: white;
+        }
+
+        .btn-auth {
+            padding: 1.1rem;
+            background: linear-gradient(135deg, var(--terracotta), var(--warm-red));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            margin-top: 0.5rem;
+        }
+
+        .btn-auth:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(217, 119, 87, 0.4);
+        }
+
+        .btn-auth:active {
+            transform: scale(0.98);
+        }
+
+        /* Main App */
+        .app-container {
+            display: none;
+        }
+
+        .app-container.active {
+            display: block;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(250, 247, 240, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 3px solid var(--stroke);
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-brand {
+            font-family: 'Fraunces', serif;
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: var(--ink);
+            letter-spacing: -0.02em;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.5rem 1rem;
+            background: white;
+            border: 2px solid var(--stroke);
+            border-radius: 50px;
+        }
+
+        .user-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--terracotta), var(--forest));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .btn-signout {
+            padding: 0.7rem 1.5rem;
+            background: transparent;
+            color: var(--ink);
+            border: 2px solid var(--stroke);
+            border-radius: 50px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-signout:hover {
+            background: var(--ink);
+            color: white;
+            border-color: var(--ink);
+        }
+
+        /* Dashboard */
+        .dashboard {
+            padding: 6rem 2rem 3rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .welcome-section {
+            margin-bottom: 3rem;
+            animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s backwards;
+        }
+
+        .welcome-section h1 {
+            font-size: 3.5rem;
+            font-weight: 900;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            color: var(--ink);
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-section p {
+            font-size: 1.2rem;
+            opacity: 0.6;
+        }
+
+        /* Notes Grid */
+        .notes-section {
+            margin-bottom: 3rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 3px solid var(--stroke);
+        }
+
+        .section-header h2 {
+            font-family: 'Fraunces', serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--ink);
+        }
+
+        .btn-new {
+            padding: 0.9rem 2rem;
+            background: linear-gradient(135deg, var(--terracotta), var(--warm-red));
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 12px var(--glow);
+        }
+
+        .btn-new:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(217, 119, 87, 0.4);
+        }
+
+        .btn-new:active {
+            transform: scale(0.96);
+        }
+
+        .notes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 2rem;
+        }
+
+        .note-card {
+            background: white;
+            border: 3px solid var(--stroke);
+            border-radius: 20px;
+            padding: 2rem;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+        }
+
+        .note-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--terracotta), var(--forest));
+            transform: scaleY(0);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .note-card:hover::before {
+            transform: scaleY(1);
+        }
+
+        .note-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 50px rgba(45, 42, 38, 0.15);
+            border-color: var(--terracotta);
+        }
+
+        .note-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1.2rem;
+        }
+
+        .note-title {
+            font-family: 'Fraunces', serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 0.8rem;
+        }
+
+        .note-preview {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: var(--ink);
+            opacity: 0.7;
+            margin-bottom: 1.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .note-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 2px solid var(--stroke);
+        }
+
+        .note-date {
+            font-size: 0.85rem;
+            opacity: 0.5;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .note-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .note-action {
+            width: 36px;
+            height: 36px;
+            border: 2px solid var(--stroke);
+            border-radius: 10px;
+            background: var(--cream);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .note-action:hover {
+            background: var(--terracotta);
+            border-color: var(--terracotta);
+            transform: scale(1.1);
+        }
+
+        /* Editor Modal */
+        .editor-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(45, 42, 38, 0.6);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            padding: 2rem;
+            animation: fadeInUp 0.3s ease;
+        }
+
+        .editor-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .editor-container {
+            background: white;
+            border: 3px solid var(--stroke);
+            border-radius: 24px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 30px 80px rgba(45, 42, 38, 0.2);
+        }
+
+        .editor-header {
+            padding: 2rem;
+            border-bottom: 3px solid var(--stroke);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .editor-title-input {
+            font-family: 'Fraunces', serif;
+            font-size: 2rem;
+            font-weight: 700;
+            border: none;
+            outline: none;
+            color: var(--ink);
+            width: 100%;
+            padding: 0.5rem 0;
+        }
+
+        .editor-toolbar {
+            padding: 1rem 2rem;
+            border-bottom: 2px solid var(--stroke);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .toolbar-btn {
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--stroke);
+            border-radius: 10px;
+            background: var(--cream);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1.1rem;
+        }
+
+        .toolbar-btn:hover {
+            background: var(--terracotta);
+            border-color: var(--terracotta);
             color: white;
         }
 
-        .slide-in {
-            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        .editor-content-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
         }
 
-        @keyframes slideIn {
-            from { 
-                opacity: 0;
-                transform: translateY(20px);
+        .editor-content {
+            font-family: 'Fraunces', serif;
+            font-size: 1.15rem;
+            line-height: 1.8;
+            outline: none;
+            min-height: 400px;
+            color: var(--ink);
+        }
+
+        .editor-content:empty::before {
+            content: 'Start writing your thoughts...';
+            color: var(--ink);
+            opacity: 0.3;
+            font-style: italic;
+        }
+
+        .editor-footer {
+            padding: 1.5rem 2rem;
+            border-top: 3px solid var(--stroke);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .save-status {
+            font-size: 0.9rem;
+            color: var(--forest);
+            font-weight: 600;
+        }
+
+        .btn-close {
+            padding: 0.8rem 2rem;
+            background: var(--ink);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-close:hover {
+            background: var(--deep-ink);
+            transform: scale(1.05);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+        }
+
+        .empty-state-icon {
+            font-size: 5rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.3;
+        }
+
+        .empty-state h3 {
+            font-family: 'Fraunces', serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.8rem;
+        }
+
+        .empty-state p {
+            font-size: 1.1rem;
+            opacity: 0.6;
+            margin-bottom: 2rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .dashboard {
+                padding: 5rem 1rem 2rem;
             }
-            to { 
-                opacity: 1;
-                transform: translateY(0);
+
+            .welcome-section h1 {
+                font-size: 2.5rem;
+            }
+
+            .notes-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .editor-modal {
+                padding: 0;
+            }
+
+            .editor-container {
+                border-radius: 0;
+                max-height: 100vh;
             }
         }
     </style>
 </head>
 <body>
-    <div id="app"></div>
+    <!-- Auth Screen -->
+    <div class="auth-screen" id="authScreen">
+        <div class="auth-container">
+            <div class="auth-header">
+                <h1>Studyos</h1>
+                <p>Your learning companion</p>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Sign In</button>
+                <button class="auth-tab" data-tab="signup">Create Account</button>
+            </div>
+
+            <form class="auth-form" id="authForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required placeholder="you@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-auth" id="authSubmit">Sign In</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app-container" id="appContainer">
+        <!-- Navigation -->
+        <nav>
+            <div class="nav-container">
+                <div class="nav-brand">Studyos</div>
+                <div class="nav-right">
+                    <div class="user-info">
+                        <span id="userEmail"></span>
+                        <div class="user-avatar" id="userAvatar"></div>
+                    </div>
+                    <button class="btn-signout" id="signoutBtn">Sign Out</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Dashboard -->
+        <div class="dashboard">
+            <div class="welcome-section">
+                <h1 id="welcomeMessage">Welcome back! ✨</h1>
+                <p>Your notes are ready for you</p>
+            </div>
+
+            <div class="notes-section">
+                <div class="section-header">
+                    <h2>Your Notes</h2>
+                    <button class="btn-new" id="newNoteBtn">+ New Note</button>
+                </div>
+
+                <div id="notesContainer">
+                    <!-- Notes will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Editor Modal -->
+    <div class="editor-modal" id="editorModal">
+        <div class="editor-container">
+            <div class="editor-header">
+                <input type="text" class="editor-title-input" id="editorTitle" placeholder="Untitled Note">
+            </div>
+            <div class="editor-toolbar">
+                <button class="toolbar-btn" onclick="format('bold')" title="Bold">𝐁</button>
+                <button class="toolbar-btn" onclick="format('italic')" title="Italic">𝐼</button>
+                <button class="toolbar-btn" onclick="format('underline')" title="Underline">U̲</button>
+                <button class="toolbar-btn" onclick="format('insertUnorderedList')" title="List">•</button>
+            </div>
+            <div class="editor-content-wrapper">
+                <div class="editor-content" id="editorContent" contenteditable="true"></div>
+            </div>
+            <div class="editor-footer">
+                <span class="save-status" id="saveStatus">Saved</span>
+                <button class="btn-close" id="closeEditorBtn">Close</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -126,481 +751,268 @@
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJseGxubWNlc2lhZ2dsbWFqendoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNjU3NTAsImV4cCI6MjA4ODY0MTc1MH0.KVawKGf8JOUymKP5DkjIRNawrkV-VraFDdFVasKhyrE'
         );
 
-        class StudyosApp {
-            constructor() {
-                this.user = null;
-                this.notes = [];
-                this.currentNote = null;
-                this.saveStatus = 'saved';
-                this.saveTimeout = null;
-                this.isAuthMode = 'login';
-                this.editorRef = null;
-                this.init();
-            }
+        // Global state
+        let currentUser = null;
+        let notes = [];
+        let currentNote = null;
+        let saveTimeout = null;
+        let authMode = 'login';
 
-            async init() {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session) {
-                    this.user = session.user;
-                    await this.loadNotes();
-                }
-                this.render();
+        // Initialize
+        async function init() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                currentUser = session.user;
+                await loadNotes();
+                showApp();
             }
+            setupEventListeners();
+        }
 
-            async loadNotes() {
-                const { data, error } = await supabase
-                    .from('notes')
-                    .select('*')
-                    .order('updated_at', { ascending: false });
-                
-                if (error) {
-                    console.error('Error loading notes:', error);
-                    return;
-                }
-                
-                this.notes = data || [];
-                if (this.notes.length > 0 && !this.currentNote) {
-                    this.currentNote = this.notes[0];
-                }
-                this.render();
-            }
-
-            async signup(email, password) {
-                const { data, error } = await supabase.auth.signUp({
-                    email,
-                    password,
+        function setupEventListeners() {
+            // Auth tabs
+            document.querySelectorAll('.auth-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    authMode = tab.dataset.tab;
+                    document.getElementById('authSubmit').textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
                 });
-                
-                if (error) {
-                    alert(error.message);
-                    return;
-                }
-                
-                alert('Check your email to confirm your account!');
-            }
+            });
 
-            async login(email, password) {
-                const { data, error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-                
-                if (error) {
-                    alert(error.message);
-                    return;
-                }
-                
-                this.user = data.user;
-                await this.loadNotes();
-            }
+            // Auth form
+            document.getElementById('authForm').addEventListener('submit', handleAuth);
 
-            async logout() {
-                await supabase.auth.signOut();
-                this.user = null;
-                this.notes = [];
-                this.currentNote = null;
-                this.render();
-            }
+            // Sign out
+            document.getElementById('signoutBtn').addEventListener('click', signOut);
 
-            async createNote() {
-                const { data, error } = await supabase
-                    .from('notes')
-                    .insert([
-                        { 
-                            user_id: this.user.id,
-                            title: 'Untitled Note',
-                            content: ''
-                        }
-                    ])
-                    .select()
-                    .single();
-                
-                if (error) {
-                    console.error('Error creating note:', error);
-                    return;
-                }
-                
-                this.notes.unshift(data);
-                this.currentNote = data;
-                this.render();
-            }
+            // New note
+            document.getElementById('newNoteBtn').addEventListener('click', createNewNote);
 
-            async deleteNote(noteId) {
-                if (!confirm('Delete this note?')) return;
-                
-                const { error } = await supabase
-                    .from('notes')
-                    .delete()
-                    .eq('id', noteId);
-                
-                if (error) {
-                    console.error('Error deleting note:', error);
-                    return;
-                }
-                
-                this.notes = this.notes.filter(n => n.id !== noteId);
-                if (this.currentNote?.id === noteId) {
-                    this.currentNote = this.notes[0] || null;
-                }
-                this.render();
-            }
+            // Close editor
+            document.getElementById('closeEditorBtn').addEventListener('click', closeEditor);
 
-            selectNote(note) {
-                this.currentNote = note;
-                this.render();
-            }
+            // Editor inputs
+            document.getElementById('editorTitle').addEventListener('input', handleEditorChange);
+            document.getElementById('editorContent').addEventListener('input', handleEditorChange);
 
-            updateNoteContent(content) {
-                if (!this.currentNote) return;
-                
-                this.currentNote.content = content;
-                this.saveStatus = 'saving';
-                this.render();
-                
-                clearTimeout(this.saveTimeout);
-                this.saveTimeout = setTimeout(() => this.saveNote(), 500);
-            }
+            // Click outside modal to close
+            document.getElementById('editorModal').addEventListener('click', (e) => {
+                if (e.target.id === 'editorModal') closeEditor();
+            });
+        }
 
-            updateNoteTitle(title) {
-                if (!this.currentNote) return;
-                
-                this.currentNote.title = title || 'Untitled Note';
-                this.saveStatus = 'saving';
-                this.render();
-                
-                clearTimeout(this.saveTimeout);
-                this.saveTimeout = setTimeout(() => this.saveNote(), 500);
-            }
+        async function handleAuth(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
 
-            async saveNote() {
-                if (!this.currentNote) return;
-                
-                const { error } = await supabase
-                    .from('notes')
-                    .update({
-                        title: this.currentNote.title,
-                        content: this.currentNote.content,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', this.currentNote.id);
-                
-                if (error) {
-                    console.error('Error saving note:', error);
-                    return;
-                }
-                
-                this.saveStatus = 'saved';
-                this.render();
-            }
-
-            formatText(command, value = null) {
-                document.execCommand(command, false, value);
-                if (this.editorRef) {
-                    this.updateNoteContent(this.editorRef.innerHTML);
-                }
-            }
-
-            render() {
-                const app = document.getElementById('app');
-                
-                if (!this.user) {
-                    app.innerHTML = this.renderAuth();
-                    this.attachAuthListeners();
+            try {
+                if (authMode === 'signup') {
+                    const { error } = await supabase.auth.signUp({ email, password });
+                    if (error) throw error;
+                    alert('Check your email to confirm your account!');
                 } else {
-                    app.innerHTML = this.renderMain();
-                    this.attachMainListeners();
+                    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                    currentUser = data.user;
+                    await loadNotes();
+                    showApp();
                 }
-            }
-
-            renderAuth() {
-                return `
-                    <div class="min-h-screen flex items-center justify-center p-4">
-                        <div class="glass rounded-2xl shadow-2xl p-8 w-full max-w-md slide-in">
-                            <div class="text-center mb-8">
-                                <h1 class="text-4xl font-bold text-gray-800 mb-2">📚 Studyos</h1>
-                                <p class="text-gray-600">Your smart note-taking companion</p>
-                            </div>
-                            
-                            <div class="flex gap-2 mb-6">
-                                <button 
-                                    class="btn flex-1 py-2 rounded-lg font-medium ${this.isAuthMode === 'login' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}"
-                                    onclick="app.setAuthMode('login')"
-                                >
-                                    Login
-                                </button>
-                                <button 
-                                    class="btn flex-1 py-2 rounded-lg font-medium ${this.isAuthMode === 'signup' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}"
-                                    onclick="app.setAuthMode('signup')"
-                                >
-                                    Sign Up
-                                </button>
-                            </div>
-                            
-                            <form id="authForm" class="space-y-4">
-                                <div>
-                                    <input 
-                                        type="email" 
-                                        id="email" 
-                                        placeholder="Email"
-                                        required
-                                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
-                                    >
-                                </div>
-                                <div>
-                                    <input 
-                                        type="password" 
-                                        id="password" 
-                                        placeholder="Password"
-                                        required
-                                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
-                                    >
-                                </div>
-                                <button 
-                                    type="submit"
-                                    class="btn w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl"
-                                >
-                                    ${this.isAuthMode === 'login' ? 'Login' : 'Sign Up'}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                `;
-            }
-
-            renderMain() {
-                return `
-                    <div class="h-screen flex flex-col">
-                        <!-- Header -->
-                        <header class="glass border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                            <h1 class="text-2xl font-bold text-gray-800">📚 Studyos</h1>
-                            <div class="flex items-center gap-4">
-                                <span class="text-sm text-gray-600">${this.user.email}</span>
-                                <button 
-                                    onclick="app.logout()"
-                                    class="btn px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium"
-                                >
-                                    Sign Out
-                                </button>
-                            </div>
-                        </header>
-
-                        <!-- Main Content -->
-                        <div class="flex-1 flex overflow-hidden">
-                            <!-- Sidebar -->
-                            <aside class="w-80 glass border-r border-gray-200 flex flex-col">
-                                <div class="p-4">
-                                    <button 
-                                        onclick="app.createNote()"
-                                        class="btn w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
-                                    >
-                                        <span class="text-xl">+</span>
-                                        New Note
-                                    </button>
-                                </div>
-                                
-                                <div class="flex-1 overflow-y-auto px-4 space-y-2">
-                                    ${this.notes.length === 0 ? `
-                                        <div class="text-center py-12 text-gray-500">
-                                            <p class="text-sm">No notes yet</p>
-                                            <p class="text-xs mt-2">Create your first note!</p>
-                                        </div>
-                                    ` : this.notes.map(note => `
-                                        <div 
-                                            class="note-item ${this.currentNote?.id === note.id ? 'active' : ''} p-3 rounded-lg cursor-pointer ${this.currentNote?.id === note.id ? 'bg-blue-50 border-l-4 border-blue-500 shadow-sm' : 'hover:bg-gray-50 border-l-4 border-transparent'}"
-                                            onclick="app.selectNote(${JSON.stringify(note).replace(/"/g, '&quot;')})"
-                                        >
-                                            <div class="flex items-start justify-between gap-2">
-                                                <h3 class="font-medium text-gray-900 truncate flex-1">
-                                                    ${note.title}
-                                                </h3>
-                                                <button 
-                                                    onclick="event.stopPropagation(); app.deleteNote('${note.id}')"
-                                                    class="text-gray-400 hover:text-red-500 transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                            <p class="text-xs text-gray-500 mt-1">
-                                                ${new Date(note.updated_at).toLocaleDateString()} ${new Date(note.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                            </p>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </aside>
-
-                            <!-- Editor -->
-                            <main class="flex-1 flex flex-col bg-white">
-                                ${!this.currentNote ? `
-                                    <div class="flex-1 flex items-center justify-center text-gray-400">
-                                        <div class="text-center">
-                                            <svg class="w-24 h-24 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                            <p class="text-lg">Select a note or create a new one</p>
-                                        </div>
-                                    </div>
-                                ` : `
-                                    <div class="border-b border-gray-200 p-6 space-y-4">
-                                        <input 
-                                            type="text"
-                                            id="noteTitle"
-                                            value="${this.currentNote.title}"
-                                            class="text-3xl font-bold text-gray-900 w-full outline-none border-none focus:ring-2 focus:ring-blue-200 rounded-lg px-2 py-1"
-                                            placeholder="Note Title"
-                                        >
-                                        
-                                        <!-- Toolbar -->
-                                        <div class="flex items-center gap-2 flex-wrap">
-                                            <button 
-                                                class="format-btn"
-                                                onclick="app.formatText('bold')"
-                                                title="Bold (Ctrl/Cmd+B)"
-                                            >
-                                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fill-rule="evenodd" d="M5 4a1 1 0 011-1h5.5a3.5 3.5 0 012.028 6.366A3.5 3.5 0 0112 16H6a1 1 0 01-1-1V4zm2 1v5h4.5a1.5 1.5 0 000-3H7zm0 7v3h5a1.5 1.5 0 000-3H7z" clip-rule="evenodd" />
-                                                </svg>
-                                            </button>
-                                            
-                                            <button 
-                                                class="format-btn"
-                                                onclick="app.formatText('italic')"
-                                                title="Italic (Ctrl/Cmd+I)"
-                                            >
-                                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1z" clip-rule="evenodd" transform="rotate(15 10 10)"/>
-                                                </svg>
-                                            </button>
-
-                                            <div class="w-px h-6 bg-gray-300"></div>
-
-                                            <button 
-                                                class="format-btn px-3"
-                                                onclick="app.formatText('fontSize', '1')"
-                                                title="Small"
-                                            >
-                                                <span class="text-xs font-medium">S</span>
-                                            </button>
-                                            
-                                            <button 
-                                                class="format-btn px-3"
-                                                onclick="app.formatText('fontSize', '3')"
-                                                title="Normal"
-                                            >
-                                                <span class="text-sm font-medium">M</span>
-                                            </button>
-                                            
-                                            <button 
-                                                class="format-btn px-3"
-                                                onclick="app.formatText('fontSize', '5')"
-                                                title="Large"
-                                            >
-                                                <span class="text-base font-medium">L</span>
-                                            </button>
-                                            
-                                            <button 
-                                                class="format-btn px-3"
-                                                onclick="app.formatText('fontSize', '6')"
-                                                title="Extra Large"
-                                            >
-                                                <span class="text-lg font-medium">XL</span>
-                                            </button>
-
-                                            <div class="flex-1"></div>
-
-                                            <!-- Save Status -->
-                                            <div class="save-indicator">
-                                                ${this.saveStatus === 'saving' ? `
-                                                    <span class="text-gray-500 text-sm flex items-center gap-2">
-                                                        <svg class="w-4 h-4 spinner" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                        </svg>
-                                                        Saving...
-                                                    </span>
-                                                ` : `
-                                                    <span class="text-emerald-500 text-sm flex items-center gap-2">
-                                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                                        </svg>
-                                                        Saved
-                                                    </span>
-                                                `}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Editor Content -->
-                                    <div class="flex-1 overflow-y-auto p-6">
-                                        <div 
-                                            id="editor"
-                                            class="editor-content text-gray-900 focus:outline-none"
-                                            contenteditable="true"
-                                        >${this.currentNote.content}</div>
-                                    </div>
-                                `}
-                            </main>
-                        </div>
-                    </div>
-                `;
-            }
-
-            attachAuthListeners() {
-                const form = document.getElementById('authForm');
-                if (form) {
-                    form.onsubmit = (e) => {
-                        e.preventDefault();
-                        const email = document.getElementById('email').value;
-                        const password = document.getElementById('password').value;
-                        
-                        if (this.isAuthMode === 'login') {
-                            this.login(email, password);
-                        } else {
-                            this.signup(email, password);
-                        }
-                    };
-                }
-            }
-
-            attachMainListeners() {
-                const editor = document.getElementById('editor');
-                if (editor) {
-                    this.editorRef = editor;
-                    
-                    editor.oninput = () => {
-                        this.updateNoteContent(editor.innerHTML);
-                    };
-
-                    editor.onkeydown = (e) => {
-                        if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-                            e.preventDefault();
-                            this.formatText('bold');
-                        }
-                        if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
-                            e.preventDefault();
-                            this.formatText('italic');
-                        }
-                    };
-                }
-
-                const titleInput = document.getElementById('noteTitle');
-                if (titleInput) {
-                    titleInput.oninput = (e) => {
-                        this.updateNoteTitle(e.target.value);
-                    };
-                }
-            }
-
-            setAuthMode(mode) {
-                this.isAuthMode = mode;
-                this.render();
+            } catch (error) {
+                alert(error.message);
             }
         }
 
-        // Initialize app
-        window.app = new StudyosApp();
+        async function signOut() {
+            await supabase.auth.signOut();
+            currentUser = null;
+            notes = [];
+            document.getElementById('authScreen').style.display = 'flex';
+            document.getElementById('appContainer').classList.remove('active');
+        }
+
+        function showApp() {
+            document.getElementById('authScreen').style.display = 'none';
+            document.getElementById('appContainer').classList.add('active');
+            document.getElementById('userEmail').textContent = currentUser.email;
+            document.getElementById('userAvatar').textContent = currentUser.email[0].toUpperCase();
+            renderNotes();
+        }
+
+        async function loadNotes() {
+            const { data, error } = await supabase
+                .from('notes')
+                .select('*')
+                .order('updated_at', { ascending: false });
+            
+            if (!error) {
+                notes = data || [];
+            }
+        }
+
+        function renderNotes() {
+            const container = document.getElementById('notesContainer');
+            
+            if (notes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📝</div>
+                        <h3>No notes yet</h3>
+                        <p>Create your first note to get started</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="notes-grid">
+                    ${notes.map((note, i) => `
+                        <div class="note-card" style="animation-delay: ${i * 0.05}s" onclick="openNote('${note.id}')">
+                            <div class="note-header">
+                                <h3 class="note-title">${note.title || 'Untitled'}</h3>
+                            </div>
+                            <div class="note-preview">${getPreview(note.content)}</div>
+                            <div class="note-footer">
+                                <span class="note-date">${formatDate(note.updated_at)}</span>
+                                <div class="note-actions">
+                                    <div class="note-action" onclick="event.stopPropagation(); deleteNote('${note.id}')">🗑️</div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function getPreview(html) {
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            const text = div.textContent || div.innerText || '';
+            return text || 'Empty note';
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            const hours = diff / (1000 * 60 * 60);
+            
+            if (hours < 24) {
+                return hours < 1 ? 'Just now' : `${Math.floor(hours)}h ago`;
+            }
+            
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        async function createNewNote() {
+            const { data, error } = await supabase
+                .from('notes')
+                .insert([{ user_id: currentUser.id, title: 'Untitled', content: '' }])
+                .select()
+                .single();
+            
+            if (!error) {
+                notes.unshift(data);
+                currentNote = data;
+                openEditorModal();
+            }
+        }
+
+        window.openNote = function(noteId) {
+            currentNote = notes.find(n => n.id === noteId);
+            openEditorModal();
+        };
+
+        function openEditorModal() {
+            document.getElementById('editorTitle').value = currentNote.title || '';
+            document.getElementById('editorContent').innerHTML = currentNote.content || '';
+            document.getElementById('editorModal').classList.add('active');
+            document.getElementById('editorTitle').focus();
+        }
+
+        function closeEditor() {
+            document.getElementById('editorModal').classList.remove('active');
+            currentNote = null;
+        }
+
+        function handleEditorChange() {
+            if (!currentNote) return;
+            
+            currentNote.title = document.getElementById('editorTitle').value || 'Untitled';
+            currentNote.content = document.getElementById('editorContent').innerHTML;
+            
+            document.getElementById('saveStatus').textContent = 'Saving...';
+            
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveNote, 500);
+        }
+
+        async function saveNote() {
+            if (!currentNote) return;
+            
+            const { error } = await supabase
+                .from('notes')
+                .update({
+                    title: currentNote.title,
+                    content: currentNote.content,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', currentNote.id);
+            
+            if (!error) {
+                document.getElementById('saveStatus').textContent = 'Saved ✓';
+                await loadNotes();
+                renderNotes();
+            }
+        }
+
+        window.deleteNote = async function(noteId) {
+            if (!confirm('Delete this note?')) return;
+            
+            const { error } = await supabase
+                .from('notes')
+                .delete()
+                .eq('id', noteId);
+            
+            if (!error) {
+                notes = notes.filter(n => n.id !== noteId);
+                renderNotes();
+                
+                // Confetti celebration
+                createConfetti();
+            }
+        };
+
+        window.format = function(command) {
+            document.execCommand(command, false, null);
+            document.getElementById('editorContent').focus();
+            handleEditorChange();
+        };
+
+        function createConfetti() {
+            const colors = ['#D97757', '#6B8E7F', '#C85846', '#A4C3B2'];
+            for (let i = 0; i < 30; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.cssText = `
+                    position: fixed;
+                    width: 10px;
+                    height: 10px;
+                    background: ${colors[Math.floor(Math.random() * colors.length)]};
+                    left: ${Math.random() * 100}%;
+                    top: -10px;
+                    border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+                    pointer-events: none;
+                    z-index: 9999;
+                    animation: confetti ${2 + Math.random()}s linear forwards;
+                `;
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 3000);
+            }
+        }
+
+        // Start the app
+        init();
     </script>
 </body>
 </html>
