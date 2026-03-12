@@ -6,12 +6,14 @@ const supabase = createClient(
 );
 
 // Global state
+const OPENROUTER_API_KEY = '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';
 let currentUser = null;
 let userSettings = null;
 let notes = [];
 let folders = [];
 let tasks = [];
 let quizzes = [];
+let grades = [];
 let currentNote = null;
 let currentView = 'all';
 let currentFolder = null;
@@ -98,6 +100,7 @@ function setupEventListeners() {
     document.getElementById('pinNoteBtn').addEventListener('click', togglePin);
     document.getElementById('deleteNoteBtn').addEventListener('click', deleteCurrentNote);
     document.getElementById('exportBtn').addEventListener('click', exportNote);
+    document.getElementById('shareBtn').addEventListener('click', shareNote);
     
     document.getElementById('modalCancel').addEventListener('click', () => closeModal());
     document.getElementById('editorModal').addEventListener('click', (e) => {
@@ -195,6 +198,12 @@ async function loadUserData() {
         .select('*')
         .order('created_at', { ascending: false });
     quizzes = quizzesData || [];
+    
+    const { data: gradesData } = await supabase
+        .from('grades')
+        .select('*')
+        .order('due_date', { ascending: true });
+    grades = gradesData || [];
     
     await loadNotes();
 }
@@ -338,6 +347,10 @@ function renderView() {
         renderTimer(mainView);
     } else if (currentView === 'quizzes') {
         renderQuizzes(mainView);
+    } else if (currentView === 'grades') {
+        renderGrades(mainView);
+    } else if (currentView === 'ai-search') {
+        renderAISearch(mainView);
     } else {
         renderNotes(mainView);
     }
@@ -452,9 +465,13 @@ function renderCalendar(container) {
                                 <h3 class="note-title">${t.title}</h3>
                                 <p style="opacity: 0.7;">${t.subject || 'No subject'} • ${formatDate(t.due_date)}</p>
                             </div>
-                            <button class="btn-secondary" onclick="toggleTask('${t.id}')">
-                                ${t.completed ? 'Undo' : 'Complete'}
-                            </button>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button class="btn-secondary" onclick="editTask('${t.id}')">Edit</button>
+                                <button class="btn-secondary" onclick="deleteTask('${t.id}')">Delete</button>
+                                <button class="btn-secondary" onclick="toggleTask('${t.id}')">
+                                    ${t.completed ? 'Undo' : 'Complete'}
+                                </button>
+                            </div>
                         </div>
                     `).join('')}
                 </div>
@@ -1299,6 +1316,495 @@ function createConfetti() {
         setTimeout(() => confetti.remove(), 3000);
     }
 }
+
+// ========== NEW FEATURES ==========
+
+// 1. Edit/Delete Tasks (Planner Upgrade)
+window.editTask = async function(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    const modalBody = document.getElementById('modalBody');
+    modalBody.innerHTML = `
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="taskTitle" value="${task.title}">
+        </div>
+        <div class="form-group">
+            <label>Subject</label>
+            <input type="text" id="taskSubject" value="${task.subject || ''}">
+        </div>
+        <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="taskDate" value="${task.due_date}">
+        </div>
+        <div class="form-group">
+            <label>Due Time</label>
+            <input type="time" id="taskTime" value="${task.due_time || ''}">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="taskDesc" value="${task.description || ''}">
+        </div>
+    `;
+    
+    document.getElementById('modalTitle').textContent = 'Edit Task';
+    document.getElementById('modalConfirm').onclick = async () => {
+        const { error } = await supabase
+            .from('planner_tasks')
+            .update({
+                title: document.getElementById('taskTitle').value,
+                subject: document.getElementById('taskSubject').value,
+                due_date: document.getElementById('taskDate').value,
+                due_time: document.getElementById('taskTime').value || null,
+                description: document.getElementById('taskDesc').value
+            })
+            .eq('id', taskId);
+        
+        if (!error) {
+            await loadUserData();
+            closeModal();
+            renderView();
+        }
+    };
+    
+    document.getElementById('modal').classList.add('active');
+};
+
+window.deleteTask = async function(taskId) {
+    if (!confirm('Delete this task?')) return;
+    
+    await supabase
+        .from('planner_tasks')
+        .delete()
+        .eq('id', taskId);
+    
+    tasks = tasks.filter(t => t.id !== taskId);
+    renderView();
+};
+
+// 2. AI Study Assistant
+async function callAI(prompt, systemPrompt = '') {
+    try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: 'google/gemini-2.0-flash-exp:free',
+                messages: [
+                    ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+                    { role: 'user', content: prompt }
+                ]
+            })
+        });
+        
+        const data = await response.json();
+        return data.choices[0].message.content;
+    } catch (error) {
+        console.error('AI Error:', error);
+        alert('AI request failed. Please try again.');
+        return null;
+    }
+}
+
+window.aiSummarize = async function() {
+    if (!currentNote || !currentNote.content) {
+        alert('No content to summarize!');
+        return;
+    }
+    
+    const text = document.getElementById('editorContent').innerText;
+    const affirmation = getRandomAffirmation();
+    
+    document.getElementById('saveStatus').innerHTML = '<span class="loading"></span> AI thinking...';
+    
+    const summary = await callAI(
+        `Summarize this note in 3-5 bullet points:\n\n${text}`,
+        'You are a helpful study assistant. Be concise and clear.'
+    );
+    
+    if (summary) {
+        document.getElementById('editorContent').innerHTML += `<h2>AI Summary</h2><p>${summary}</p><p><em>${affirmation}</em></p>`;
+        document.getElementById('saveStatus').textContent = 'Summary added! ✓';
+        handleEditorChange();
+        createConfetti();
+    }
+};
+
+window.aiGenerateQuiz = async function() {
+    if (!currentNote || !currentNote.content) {
+        alert('No content to generate quiz from!');
+        return;
+    }
+    
+    const text = document.getElementById('editorContent').innerText;
+    
+    if (text.length < 100) {
+        alert('Note is too short to generate a quiz. Add more content!');
+        return;
+    }
+    
+    document.getElementById('saveStatus').innerHTML = '<span class="loading"></span> Generating quiz...';
+    
+    const quizData = await callAI(
+        `Generate 5 multiple choice questions based on this content. Return ONLY valid JSON in this exact format:
+{
+  "questions": [
+    {
+      "question": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct": "Option A"
+    }
+  ]
+}
+
+Content:
+${text}`,
+        'You are a quiz generator. Return ONLY valid JSON, no other text.'
+    );
+    
+    if (!quizData) return;
+    
+    try {
+        const parsed = JSON.parse(quizData.replace(/```json|```/g, ''));
+        
+        // Create quiz
+        const { data: quiz } = await supabase
+            .from('quizzes')
+            .insert([{
+                user_id: currentUser.id,
+                title: `Quiz: ${currentNote.title}`,
+                description: 'Auto-generated by AI'
+            }])
+            .select()
+            .single();
+        
+        // Add questions
+        for (let i = 0; i < parsed.questions.length; i++) {
+            const q = parsed.questions[i];
+            await supabase
+                .from('quiz_questions')
+                .insert([{
+                    quiz_id: quiz.id,
+                    question_type: 'multiple',
+                    question: q.question,
+                    correct_answer: q.correct,
+                    options: q.options,
+                    position: i
+                }]);
+        }
+        
+        quizzes.unshift(quiz);
+        document.getElementById('saveStatus').textContent = 'Quiz created! ✓';
+        createConfetti();
+        alert(`✨ Created quiz with ${parsed.questions.length} questions!`);
+    } catch (e) {
+        alert('Failed to parse AI response. Try again!');
+        console.error(e);
+    }
+};
+
+window.aiFormat = async function() {
+    if (!currentNote || !currentNote.content) {
+        alert('No content to format!');
+        return;
+    }
+    
+    const text = document.getElementById('editorContent').innerText;
+    
+    document.getElementById('saveStatus').innerHTML = '<span class="loading"></span> AI formatting...';
+    
+    const formatted = await callAI(
+        `Format this into a professional document with proper headings, structure, and fix any grammar/spelling errors. Return as clean HTML using only: h1, h2, h3, p, ul, li, strong, em. No code blocks or markdown.
+
+Content:
+${text}`,
+        'You are a professional document formatter. Return clean HTML only.'
+    );
+    
+    if (formatted) {
+        const clean = formatted.replace(/```html|```/g, '').trim();
+        document.getElementById('editorContent').innerHTML = clean;
+        document.getElementById('saveStatus').textContent = 'Formatted! ✓';
+        handleEditorChange();
+        createConfetti();
+        
+        // Also export as docx
+        exportAsDocx();
+    }
+};
+
+function exportAsDocx() {
+    const title = currentNote.title || 'Untitled';
+    const content = document.getElementById('editorContent').innerHTML;
+    
+    // Create simple Word-compatible HTML
+    const docHTML = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>${title}</title></head>
+        <body>${content}</body>
+        </html>
+    `;
+    
+    const blob = new Blob(['\ufeff', docHTML], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// 4. Smart AI Search
+function renderAISearch(container) {
+    container.innerHTML = `
+        <div style="max-width: 700px; margin: 0 auto;">
+            <h2 style="margin-bottom: 1.5rem;">🔮 Smart AI Search</h2>
+            <p style="opacity: 0.7; margin-bottom: 2rem;">Search your notes by meaning, not just keywords. Ask questions like "What did I learn about photosynthesis?" or "Show me my chemistry notes"</p>
+            
+            <div class="form-group">
+                <input type="text" id="aiSearchInput" placeholder="Ask anything about your notes..." style="width: 100%; padding: 1.2rem; font-size: 1.1rem; border: 3px solid var(--stroke); border-radius: 16px;">
+            </div>
+            
+            <button class="btn-primary" onclick="performAISearch()" style="margin-top: 1rem;">Search with AI</button>
+            
+            <div id="aiSearchResults" style="margin-top: 3rem;"></div>
+        </div>
+    `;
+    
+    document.getElementById('aiSearchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') performAISearch();
+    });
+}
+
+window.performAISearch = async function() {
+    const query = document.getElementById('aiSearchInput').value;
+    if (!query) return;
+    
+    const resultsDiv = document.getElementById('aiSearchResults');
+    resultsDiv.innerHTML = '<div class="loading" style="margin: 2rem auto;"></div>';
+    
+    // Get all notes content
+    const notesContext = notes.map(n => `Title: ${n.title}\nContent: ${getPreview(n.content)}`).join('\n\n---\n\n');
+    
+    const response = await callAI(
+        `Based on these notes, answer this question: "${query}"
+
+Notes:
+${notesContext}
+
+Provide a helpful answer and list which note titles are most relevant.`,
+        'You are a helpful study assistant analyzing notes.'
+    );
+    
+    if (response) {
+        resultsDiv.innerHTML = `
+            <div style="background: white; border: 3px solid var(--stroke); border-radius: 16px; padding: 2rem;">
+                <h3 style="margin-bottom: 1rem;">AI Answer:</h3>
+                <div style="line-height: 1.8; white-space: pre-wrap;">${response}</div>
+            </div>
+        `;
+    }
+};
+
+// 5. Share Notes
+async function shareNote() {
+    if (!currentNote) return;
+    
+    if (currentNote.is_shared && currentNote.share_token) {
+        const url = `${window.location.origin}/share/${currentNote.share_token}`;
+        
+        navigator.clipboard.writeText(url);
+        alert(`📋 Share link copied!\n\n${url}\n\nAnyone with this link can view this note (read-only).`);
+        return;
+    }
+    
+    // Generate share token
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    
+    const { error } = await supabase
+        .from('notes')
+        .update({
+            is_shared: true,
+            share_token: token
+        })
+        .eq('id', currentNote.id);
+    
+    if (!error) {
+        currentNote.is_shared = true;
+        currentNote.share_token = token;
+        
+        const url = `${window.location.origin}/share/${token}`;
+        navigator.clipboard.writeText(url);
+        alert(`✅ Note is now shared!\n\n📋 Link copied to clipboard:\n${url}\n\nAnyone with this link can view this note (read-only).`);
+        createConfetti();
+    }
+}
+
+// 6. Grade Calculator
+function renderGrades(container) {
+    const classes = [...new Set(grades.map(g => g.class_name))];
+    
+    container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2>📈 Grade Calculator</h2>
+            <button class="btn-primary" onclick="addGrade()">+ Add Grade</button>
+        </div>
+        
+        ${classes.length === 0 ? `
+            <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <h3>No grades yet</h3>
+                <p>Add your assignments to track your GPA</p>
+            </div>
+        ` : classes.map(className => {
+            const classGrades = grades.filter(g => g.class_name === className);
+            const total = classGrades.reduce((sum, g) => sum + (g.grade || 0) * g.weight, 0);
+            const totalWeight = classGrades.reduce((sum, g) => sum + g.weight, 0);
+            const avg = totalWeight > 0 ? (total / totalWeight).toFixed(2) : 0;
+            
+            return `
+                <div style="background: white; border: 3px solid var(--stroke); border-radius: 16px; padding: 2rem; margin-bottom: 2rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3>${className}</h3>
+                        <div style="font-size: 2rem; font-weight: 900; color: ${avg >= 90 ? '#A4C3B2' : avg >= 80 ? '#6B8E7F' : avg >= 70 ? '#D97757' : '#C85846'}">${avg}%</div>
+                    </div>
+                    
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr style="background: var(--sand); font-weight: 700;">
+                            <th style="padding: 0.8rem; text-align: left; border: 2px solid var(--stroke);">Assignment</th>
+                            <th style="padding: 0.8rem; text-align: center; border: 2px solid var(--stroke);">Grade</th>
+                            <th style="padding: 0.8rem; text-align: center; border: 2px solid var(--stroke);">Weight</th>
+                            <th style="padding: 0.8rem; text-align: center; border: 2px solid var(--stroke);">Actions</th>
+                        </tr>
+                        ${classGrades.map(g => `
+                            <tr>
+                                <td style="padding: 0.8rem; border: 2px solid var(--stroke);">${g.assignment_name}</td>
+                                <td style="padding: 0.8rem; text-align: center; border: 2px solid var(--stroke);">${g.grade ? `${g.grade}/${g.total}` : 'Not graded'}</td>
+                                <td style="padding: 0.8rem; text-align: center; border: 2px solid var(--stroke);">${g.weight}x</td>
+                                <td style="padding: 0.8rem; text-align: center; border: 2px solid var(--stroke);">
+                                    <button class="btn-secondary" onclick="editGrade('${g.id}')" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Edit</button>
+                                    <button class="btn-secondary" onclick="deleteGrade('${g.id}')" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Delete</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                    
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: var(--sand); border-radius: 12px;">
+                        <strong>What you need on the final:</strong>
+                        <p style="margin-top: 0.5rem; opacity: 0.8;">Enter your final exam weight and desired grade to calculate what score you need!</p>
+                    </div>
+                </div>
+            `;
+        }).join('')}
+    `;
+}
+
+window.addGrade = function() {
+    const modalBody = document.getElementById('modalBody');
+    modalBody.innerHTML = `
+        <div class="form-group">
+            <label>Class Name</label>
+            <input type="text" id="gradeClass" placeholder="Math 101">
+        </div>
+        <div class="form-group">
+            <label>Assignment Name</label>
+            <input type="text" id="gradeAssignment" placeholder="Quiz 1">
+        </div>
+        <div class="form-group">
+            <label>Your Score</label>
+            <input type="number" id="gradeScore" placeholder="85">
+        </div>
+        <div class="form-group">
+            <label>Total Points</label>
+            <input type="number" id="gradeTotal" placeholder="100">
+        </div>
+        <div class="form-group">
+            <label>Weight (1x = normal, 2x = double weighted)</label>
+            <input type="number" step="0.1" id="gradeWeight" value="1">
+        </div>
+        <div class="form-group">
+            <label>Category</label>
+            <input type="text" id="gradeCategory" placeholder="Quiz">
+        </div>
+    `;
+    
+    document.getElementById('modalTitle').textContent = 'Add Grade';
+    document.getElementById('modalConfirm').onclick = async () => {
+        const { data, error } = await supabase
+            .from('grades')
+            .insert([{
+                user_id: currentUser.id,
+                class_name: document.getElementById('gradeClass').value,
+                assignment_name: document.getElementById('gradeAssignment').value,
+                grade: parseFloat(document.getElementById('gradeScore').value),
+                total: parseFloat(document.getElementById('gradeTotal').value),
+                weight: parseFloat(document.getElementById('gradeWeight').value),
+                category: document.getElementById('gradeCategory').value
+            }])
+            .select()
+            .single();
+        
+        if (!error) {
+            grades.push(data);
+            closeModal();
+            renderView();
+        }
+    };
+    
+    document.getElementById('modal').classList.add('active');
+};
+
+window.editGrade = async function(gradeId) {
+    const grade = grades.find(g => g.id === gradeId);
+    if (!grade) return;
+    
+    const modalBody = document.getElementById('modalBody');
+    modalBody.innerHTML = `
+        <div class="form-group">
+            <label>Your Score</label>
+            <input type="number" id="gradeScore" value="${grade.grade || ''}">
+        </div>
+        <div class="form-group">
+            <label>Total Points</label>
+            <input type="number" id="gradeTotal" value="${grade.total}">
+        </div>
+    `;
+    
+    document.getElementById('modalTitle').textContent = 'Edit Grade';
+    document.getElementById('modalConfirm').onclick = async () => {
+        const { error } = await supabase
+            .from('grades')
+            .update({
+                grade: parseFloat(document.getElementById('gradeScore').value) || null,
+                total: parseFloat(document.getElementById('gradeTotal').value)
+            })
+            .eq('id', gradeId);
+        
+        if (!error) {
+            await loadUserData();
+            closeModal();
+            renderView();
+        }
+    };
+    
+    document.getElementById('modal').classList.add('active');
+};
+
+window.deleteGrade = async function(gradeId) {
+    if (!confirm('Delete this grade?')) return;
+    
+    await supabase
+        .from('grades')
+        .delete()
+        .eq('id', gradeId);
+    
+    grades = grades.filter(g => g.id !== gradeId);
+    renderView();
+};
 
 // Start the app
 init();
