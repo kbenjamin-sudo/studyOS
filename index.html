@@ -264,6 +264,18 @@
                     <span class="sidebar-item-icon">📊</span>
                     <span>Stats</span>
                 </div>
+                <div class="sidebar-item" data-view="grades">
+                    <span class="sidebar-item-icon">📈</span>
+                    <span>Grade Calculator</span>
+                </div>
+            </div>
+            
+            <div class="sidebar-section">
+                <div class="sidebar-title">AI Tools</div>
+                <div class="sidebar-item" data-view="ai-search">
+                    <span class="sidebar-item-icon">🔮</span>
+                    <span>Smart Search</span>
+                </div>
             </div>
             
             <div class="sidebar-section">
@@ -324,6 +336,9 @@
                 <button class="toolbar-btn" onclick="insertTable()">Table</button>
                 <button class="toolbar-btn" onclick="insertLink()">[[Link]]</button>
                 <button class="toolbar-btn" onclick="insertTag()">#Tag</button>
+                <button class="toolbar-btn" onclick="aiSummarize()" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none;">✨ AI Summarize</button>
+                <button class="toolbar-btn" onclick="aiGenerateQuiz()" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border: none;">🎯 AI Quiz</button>
+                <button class="toolbar-btn" onclick="aiFormat()" style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; border: none;">📄 Format Doc</button>
             </div>
             <div class="editor-content-wrapper">
                 <div class="editor-content" id="editorContent" contenteditable="true"></div>
@@ -335,6 +350,7 @@
             <div class="editor-footer">
                 <span class="save-status" id="saveStatus">Saved</span>
                 <div class="editor-actions">
+                    <button class="btn-secondary" id="shareBtn">🔗 Share</button>
                     <button class="btn-secondary" id="exportBtn">Export</button>
                     <button class="btn-secondary" id="deleteNoteBtn">Delete</button>
                     <button class="btn-primary" id="closeEditorBtn">Close</button>
