@@ -23,6 +23,15 @@ let timerInterval = null;
 let timerSeconds = 25 * 60;
 let isTimerRunning = false;
 let currentAffirmation = '';
+let rearrangeMode = false;
+let achievements = {
+    firstNote: false,
+    streak7: false,
+    streak30: false,
+    quiz10: false,
+    notes50: false,
+    taskMaster: false
+};
 
 // Templates
 const templates = {
@@ -92,6 +101,7 @@ function setupEventListeners() {
     document.getElementById('darkModeBtn').addEventListener('click', toggleDarkMode);
     document.getElementById('templateBtn').addEventListener('click', showTemplateModal);
     document.getElementById('searchInput').addEventListener('input', handleSearch);
+    document.getElementById('rearrangeModeBtn').addEventListener('click', toggleRearrangeMode);
     
     document.getElementById('closeEditorBtn').addEventListener('click', closeEditor);
     document.getElementById('editorTitle').addEventListener('input', handleEditorChange);
@@ -349,8 +359,6 @@ function renderView() {
         renderQuizzes(mainView);
     } else if (currentView === 'grades') {
         renderGrades(mainView);
-    } else if (currentView === 'ai-search') {
-        renderAISearch(mainView);
     } else {
         renderNotes(mainView);
     }
@@ -399,6 +407,10 @@ function renderNotes(container) {
             }).join('')}
         </div>
     `;
+    
+    if (rearrangeMode) {
+        enableDragDrop();
+    }
 }
 
 function renderCalendar(container) {
@@ -562,6 +574,7 @@ window.toggleTask = async function(taskId) {
     
     if (task.completed) {
         createConfetti();
+        checkAchievements();
     }
     
     renderView();
@@ -1020,6 +1033,7 @@ async function createNewNote(template = '') {
         currentNote = data;
         openEditorModal();
         updateCounts();
+        checkAchievements();
     }
 }
 
@@ -1319,6 +1333,134 @@ function createConfetti() {
 
 // ========== NEW FEATURES ==========
 
+// Achievements System
+function showAchievement(icon, title, desc) {
+    const popup = document.getElementById('achievementPopup');
+    document.getElementById('achievementIcon').textContent = icon;
+    document.getElementById('achievementTitle').textContent = title;
+    document.getElementById('achievementDesc').textContent = desc;
+    
+    popup.classList.add('show');
+    createConfetti();
+    
+    // Play sound effect (browser ding)
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBi2Czvzah0YPFmCz6+qbThELTqTl8LJgGwU7k9fyz3kpBSd5yPLaizsKGGS56+uhUhEJTKXm8bVgGgY5k9nyz3kqBSh4yPLbjDoLF2W66+yhUhEJTKXm8bJgGwU7lNnyz3kpBSd5yPLbjDoLF2W66+yhUhEJTKXm8bJgGwU7lNny');
+    audio.play().catch(() => {});
+    
+    setTimeout(() => popup.classList.remove('show'), 4000);
+}
+
+function checkAchievements() {
+    if (!achievements.firstNote && notes.length === 1) {
+        achievements.firstNote = true;
+        showAchievement('🎉', 'First Note!', 'The journey of a thousand notes begins with one');
+    }
+    
+    if (!achievements.streak7 && userSettings.current_streak >= 7) {
+        achievements.streak7 = true;
+        showAchievement('🔥', '7 Day Streak!', 'You\'re on fire! Consistency is key');
+    }
+    
+    if (!achievements.streak30 && userSettings.current_streak >= 30) {
+        achievements.streak30 = true;
+        showAchievement('💎', '30 Day Streak!', 'Legendary! You\'re unstoppable');
+    }
+    
+    if (!achievements.notes50 && notes.length >= 50) {
+        achievements.notes50 = true;
+        showAchievement('📚', '50 Notes!', 'Knowledge keeper! Your library is growing');
+    }
+    
+    if (!achievements.quiz10 && quizzes.length >= 10) {
+        achievements.quiz10 = true;
+        showAchievement('🎯', 'Quiz Master!', '10 quizzes created! Testing yourself is smart');
+    }
+    
+    const completedTasks = tasks.filter(t => t.completed).length;
+    if (!achievements.taskMaster && completedTasks >= 25) {
+        achievements.taskMaster = true;
+        showAchievement('✅', 'Task Master!', '25 tasks completed! Productivity legend');
+    }
+}
+
+// Rearrange Mode
+function toggleRearrangeMode() {
+    rearrangeMode = !rearrangeMode;
+    const btn = document.getElementById('rearrangeModeBtn');
+    
+    if (rearrangeMode) {
+        btn.classList.add('active');
+        document.querySelector('.notes-grid')?.classList.add('rearrange-mode');
+        alert('✨ Rearrange Mode Active!\n\nDrag and drop notes to reorder them.');
+        enableDragDrop();
+    } else {
+        btn.classList.remove('active');
+        document.querySelector('.notes-grid')?.classList.remove('rearrange-mode');
+        disableDragDrop();
+    }
+}
+
+function enableDragDrop() {
+    // This will be called after notes are rendered
+    setTimeout(() => {
+        const noteCards = document.querySelectorAll('.note-card');
+        noteCards.forEach((card, index) => {
+            card.draggable = true;
+            card.dataset.position = index;
+            
+            card.addEventListener('dragstart', (e) => {
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', card.innerHTML);
+            });
+            
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+            });
+            
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const dragging = document.querySelector('.dragging');
+                if (dragging && dragging !== card) {
+                    const rect = card.getBoundingClientRect();
+                    const midpoint = rect.top + rect.height / 2;
+                    if (e.clientY < midpoint) {
+                        card.parentNode.insertBefore(dragging, card);
+                    } else {
+                        card.parentNode.insertBefore(dragging, card.nextSibling);
+                    }
+                }
+            });
+            
+            card.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                // Save new positions
+                const cards = document.querySelectorAll('.note-card');
+                cards.forEach(async (c, idx) => {
+                    const noteId = c.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    const note = notes.find(n => n.id === noteId);
+                    if (note) {
+                        note.position = idx;
+                        await supabase
+                            .from('notes')
+                            .update({ position: idx })
+                            .eq('id', noteId);
+                    }
+                });
+                createConfetti();
+            });
+        });
+    }, 100);
+}
+
+function disableDragDrop() {
+    const noteCards = document.querySelectorAll('.note-card');
+    noteCards.forEach(card => {
+        card.draggable = false;
+        card.replaceWith(card.cloneNode(true));
+    });
+}
+
 // 1. Edit/Delete Tasks (Planner Upgrade)
 window.editTask = async function(taskId) {
     const task = tasks.find(t => t.id === taskId);
@@ -1383,7 +1525,7 @@ window.deleteTask = async function(taskId) {
     renderView();
 };
 
-// 2. AI Study Assistant
+// AI DOCX Converter with Custom Instructions
 async function callAI(prompt, systemPrompt = '') {
     try {
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -1410,119 +1552,42 @@ async function callAI(prompt, systemPrompt = '') {
     }
 }
 
-window.aiSummarize = async function() {
-    if (!currentNote || !currentNote.content) {
-        alert('No content to summarize!');
-        return;
-    }
-    
-    const text = document.getElementById('editorContent').innerText;
-    const affirmation = getRandomAffirmation();
-    
-    document.getElementById('saveStatus').innerHTML = '<span class="loading"></span> AI thinking...';
-    
-    const summary = await callAI(
-        `Summarize this note in 3-5 bullet points:\n\n${text}`,
-        'You are a helpful study assistant. Be concise and clear.'
-    );
-    
-    if (summary) {
-        document.getElementById('editorContent').innerHTML += `<h2>AI Summary</h2><p>${summary}</p><p><em>${affirmation}</em></p>`;
-        document.getElementById('saveStatus').textContent = 'Summary added! ✓';
-        handleEditorChange();
-        createConfetti();
-    }
-};
-
-window.aiGenerateQuiz = async function() {
-    if (!currentNote || !currentNote.content) {
-        alert('No content to generate quiz from!');
-        return;
-    }
-    
-    const text = document.getElementById('editorContent').innerText;
-    
-    if (text.length < 100) {
-        alert('Note is too short to generate a quiz. Add more content!');
-        return;
-    }
-    
-    document.getElementById('saveStatus').innerHTML = '<span class="loading"></span> Generating quiz...';
-    
-    const quizData = await callAI(
-        `Generate 5 multiple choice questions based on this content. Return ONLY valid JSON in this exact format:
-{
-  "questions": [
-    {
-      "question": "Question text here?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correct": "Option A"
-    }
-  ]
-}
-
-Content:
-${text}`,
-        'You are a quiz generator. Return ONLY valid JSON, no other text.'
-    );
-    
-    if (!quizData) return;
-    
-    try {
-        const parsed = JSON.parse(quizData.replace(/```json|```/g, ''));
-        
-        // Create quiz
-        const { data: quiz } = await supabase
-            .from('quizzes')
-            .insert([{
-                user_id: currentUser.id,
-                title: `Quiz: ${currentNote.title}`,
-                description: 'Auto-generated by AI'
-            }])
-            .select()
-            .single();
-        
-        // Add questions
-        for (let i = 0; i < parsed.questions.length; i++) {
-            const q = parsed.questions[i];
-            await supabase
-                .from('quiz_questions')
-                .insert([{
-                    quiz_id: quiz.id,
-                    question_type: 'multiple',
-                    question: q.question,
-                    correct_answer: q.correct,
-                    options: q.options,
-                    position: i
-                }]);
-        }
-        
-        quizzes.unshift(quiz);
-        document.getElementById('saveStatus').textContent = 'Quiz created! ✓';
-        createConfetti();
-        alert(`✨ Created quiz with ${parsed.questions.length} questions!`);
-    } catch (e) {
-        alert('Failed to parse AI response. Try again!');
-        console.error(e);
-    }
-};
-
 window.aiFormat = async function() {
     if (!currentNote || !currentNote.content) {
         alert('No content to format!');
         return;
     }
     
-    const text = document.getElementById('editorContent').innerText;
+    let text = document.getElementById('editorContent').innerText;
+    
+    // Extract custom AI instructions
+    let customInstructions = '';
+    const geminiMatch = text.match(/\(Gemini\)(.*?)\(End\)/s);
+    if (geminiMatch) {
+        customInstructions = geminiMatch[1].trim();
+        // Remove the instruction markers from text
+        text = text.replace(/\(Gemini\).*?\(End\)/s, '').trim();
+    }
     
     document.getElementById('saveStatus').innerHTML = '<span class="loading"></span> AI formatting...';
     
-    const formatted = await callAI(
-        `Format this into a professional document with proper headings, structure, and fix any grammar/spelling errors. Return as clean HTML using only: h1, h2, h3, p, ul, li, strong, em. No code blocks or markdown.
+    const systemPrompt = `You are a professional document formatter. You must be CREATIVE and make documents beautiful.
 
-Content:
-${text}`,
-        'You are a professional document formatter. Return clean HTML only.'
+MANDATORY STYLING RULES:
+1. Use Playfair Display for ALL headings (h1, h2, h3)
+2. Use Times New Roman for ALL body text (p, li, etc)
+3. Make it look elegant and professional
+4. Add proper spacing and margins
+5. Be creative with formatting - use blockquotes, emphasis, proper hierarchy
+
+${customInstructions ? `ADDITIONAL USER INSTRUCTIONS: ${customInstructions}` : ''}
+
+Return ONLY HTML using these tags: h1, h2, h3, p, ul, li, ol, strong, em, blockquote
+NO code blocks, NO markdown, NO explanations - JUST the formatted HTML.`;
+    
+    const formatted = await callAI(
+        `Format this document beautifully:\n\n${text}`,
+        systemPrompt
     );
     
     if (formatted) {
@@ -1532,24 +1597,86 @@ ${text}`,
         handleEditorChange();
         createConfetti();
         
-        // Also export as docx
-        exportAsDocx();
+        // Export as DOCX
+        exportAsDocx(clean);
+        showAchievement('📄', 'Document Exported!', 'Your beautiful DOCX is ready!');
     }
 };
 
-function exportAsDocx() {
+function exportAsDocx(htmlContent) {
     const title = currentNote.title || 'Untitled';
-    const content = document.getElementById('editorContent').innerHTML;
     
-    // Create simple Word-compatible HTML
-    const docHTML = `
-        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-        <head><meta charset='utf-8'><title>${title}</title></head>
-        <body>${content}</body>
+    // Inject fonts and styles into Word document
+    const styledHTML = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' 
+              xmlns:w='urn:schemas-microsoft-com:office:word' 
+              xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+            <meta charset='utf-8'>
+            <title>${title}</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
+                
+                body {
+                    font-family: 'Times New Roman', Times, serif;
+                    font-size: 12pt;
+                    line-height: 1.6;
+                    margin: 1in;
+                    color: #000;
+                }
+                h1, h2, h3, h4, h5, h6 {
+                    font-family: 'Playfair Display', serif;
+                    font-weight: 700;
+                    margin-top: 24pt;
+                    margin-bottom: 12pt;
+                }
+                h1 {
+                    font-size: 24pt;
+                    font-weight: 900;
+                    border-bottom: 2px solid #000;
+                    padding-bottom: 6pt;
+                }
+                h2 {
+                    font-size: 18pt;
+                }
+                h3 {
+                    font-size: 14pt;
+                }
+                p {
+                    margin: 12pt 0;
+                    text-align: justify;
+                }
+                ul, ol {
+                    margin: 12pt 0;
+                    padding-left: 40pt;
+                }
+                li {
+                    margin: 6pt 0;
+                }
+                blockquote {
+                    border-left: 4pt solid #ccc;
+                    padding-left: 20pt;
+                    margin: 12pt 0;
+                    font-style: italic;
+                    color: #555;
+                }
+                strong {
+                    font-weight: 700;
+                }
+                em {
+                    font-style: italic;
+                }
+            </style>
+        </head>
+        <body>
+            ${htmlContent}
+        </body>
         </html>
     `;
     
-    const blob = new Blob(['\ufeff', docHTML], { type: 'application/msword' });
+    const blob = new Blob(['\ufeff', styledHTML], { 
+        type: 'application/vnd.ms-word' 
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1558,59 +1685,7 @@ function exportAsDocx() {
     URL.revokeObjectURL(url);
 }
 
-// 4. Smart AI Search
-function renderAISearch(container) {
-    container.innerHTML = `
-        <div style="max-width: 700px; margin: 0 auto;">
-            <h2 style="margin-bottom: 1.5rem;">🔮 Smart AI Search</h2>
-            <p style="opacity: 0.7; margin-bottom: 2rem;">Search your notes by meaning, not just keywords. Ask questions like "What did I learn about photosynthesis?" or "Show me my chemistry notes"</p>
-            
-            <div class="form-group">
-                <input type="text" id="aiSearchInput" placeholder="Ask anything about your notes..." style="width: 100%; padding: 1.2rem; font-size: 1.1rem; border: 3px solid var(--stroke); border-radius: 16px;">
-            </div>
-            
-            <button class="btn-primary" onclick="performAISearch()" style="margin-top: 1rem;">Search with AI</button>
-            
-            <div id="aiSearchResults" style="margin-top: 3rem;"></div>
-        </div>
-    `;
-    
-    document.getElementById('aiSearchInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') performAISearch();
-    });
-}
-
-window.performAISearch = async function() {
-    const query = document.getElementById('aiSearchInput').value;
-    if (!query) return;
-    
-    const resultsDiv = document.getElementById('aiSearchResults');
-    resultsDiv.innerHTML = '<div class="loading" style="margin: 2rem auto;"></div>';
-    
-    // Get all notes content
-    const notesContext = notes.map(n => `Title: ${n.title}\nContent: ${getPreview(n.content)}`).join('\n\n---\n\n');
-    
-    const response = await callAI(
-        `Based on these notes, answer this question: "${query}"
-
-Notes:
-${notesContext}
-
-Provide a helpful answer and list which note titles are most relevant.`,
-        'You are a helpful study assistant analyzing notes.'
-    );
-    
-    if (response) {
-        resultsDiv.innerHTML = `
-            <div style="background: white; border: 3px solid var(--stroke); border-radius: 16px; padding: 2rem;">
-                <h3 style="margin-bottom: 1rem;">AI Answer:</h3>
-                <div style="line-height: 1.8; white-space: pre-wrap;">${response}</div>
-            </div>
-        `;
-    }
-};
-
-// 5. Share Notes
+// Share Notes
 async function shareNote() {
     if (!currentNote) return;
     
@@ -1622,7 +1697,6 @@ async function shareNote() {
         return;
     }
     
-    // Generate share token
     const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     
     const { error } = await supabase
@@ -1644,7 +1718,7 @@ async function shareNote() {
     }
 }
 
-// 6. Grade Calculator
+// Grade Calculator
 function renderGrades(container) {
     const classes = [...new Set(grades.map(g => g.class_name))];
     
