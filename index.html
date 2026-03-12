@@ -21,10 +21,14 @@
             --glow: rgba(217, 119, 87, 0.2);
         }
         [data-theme="dark"] {
-            --cream: #1A1816;
-            --ink: #FAF7F0;
-            --sand: #2D2A26;
-            --stroke: rgba(250, 247, 240, 0.12);
+            --cream: #0f0e0d;
+            --ink: #f5f5f0;
+            --sand: #1a1816;
+            --stroke: rgba(245, 245, 240, 0.15);
+            --terracotta: #ff8a65;
+            --forest: #81c784;
+            --warm-red: #ff5252;
+            --soft-green: #b2dfdb;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: var(--cream); color: var(--ink); line-height: 1.6; overflow-x: hidden; transition: background 0.3s; }
@@ -184,6 +188,16 @@
         
         .confetti { position: fixed; width: 10px; height: 10px; z-index: 9999; pointer-events: none; animation: confetti 3s linear forwards; }
         
+        .achievement-popup { position: fixed; top: 2rem; right: 2rem; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 1.5rem 2rem; border-radius: 16px; box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4); z-index: 9999; display: none; animation: fadeInUp 0.5s ease; }
+        .achievement-popup.show { display: block; }
+        .achievement-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+        .achievement-title { font-size: 1.3rem; font-weight: 900; margin-bottom: 0.3rem; }
+        .achievement-desc { opacity: 0.9; font-size: 0.9rem; }
+        
+        .rearrange-mode .note-card { cursor: move; transition: all 0.2s; }
+        .rearrange-mode .note-card:hover { transform: scale(1.05); box-shadow: 0 12px 30px rgba(217, 119, 87, 0.3); }
+        .rearrange-mode .note-card.dragging { opacity: 0.5; }
+        
         @media (max-width: 768px) {
             .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
             .sidebar.active { transform: translateX(0); }
@@ -271,10 +285,10 @@
             </div>
             
             <div class="sidebar-section">
-                <div class="sidebar-title">AI Tools</div>
-                <div class="sidebar-item" data-view="ai-search">
-                    <span class="sidebar-item-icon">🔮</span>
-                    <span>Smart Search</span>
+                <div class="sidebar-title">Actions</div>
+                <div class="sidebar-item" id="rearrangeModeBtn">
+                    <span class="sidebar-item-icon">✨</span>
+                    <span>Rearrange Mode</span>
                 </div>
             </div>
             
@@ -336,9 +350,7 @@
                 <button class="toolbar-btn" onclick="insertTable()">Table</button>
                 <button class="toolbar-btn" onclick="insertLink()">[[Link]]</button>
                 <button class="toolbar-btn" onclick="insertTag()">#Tag</button>
-                <button class="toolbar-btn" onclick="aiSummarize()" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none;">✨ AI Summarize</button>
-                <button class="toolbar-btn" onclick="aiGenerateQuiz()" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border: none;">🎯 AI Quiz</button>
-                <button class="toolbar-btn" onclick="aiFormat()" style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; border: none;">📄 Format Doc</button>
+                <button class="toolbar-btn" onclick="aiFormat()" style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; border: none;">📄 Export as DOCX</button>
             </div>
             <div class="editor-content-wrapper">
                 <div class="editor-content" id="editorContent" contenteditable="true"></div>
@@ -368,6 +380,12 @@
                 <button class="btn-primary" id="modalConfirm">Confirm</button>
             </div>
         </div>
+    </div>
+
+    <div class="achievement-popup" id="achievementPopup">
+        <div class="achievement-icon" id="achievementIcon">🏆</div>
+        <div class="achievement-title" id="achievementTitle">Achievement Unlocked!</div>
+        <div class="achievement-desc" id="achievementDesc">You did it!</div>
     </div>
 
     <script type="module" src="script.js"></script>
